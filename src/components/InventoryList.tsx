@@ -1,0 +1,96 @@
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { InventoryItem } from '@/data/mockData';
+import { Package, Search, Plus, AlertTriangle, CheckCircle } from 'lucide-react';
+
+interface InventoryListProps {
+  items: InventoryItem[];
+  onAddItem: (item: InventoryItem) => void;
+}
+
+const InventoryList = ({ items, onAddItem }: InventoryListProps) => {
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredItems = items.filter(item =>
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.hsn.includes(searchTerm)
+  );
+
+  const getStockStatus = (stock: number) => {
+    if (stock === 0) return { label: 'Out of Stock', variant: 'destructive' as const, icon: AlertTriangle };
+    if (stock < 50) return { label: 'Low Stock', variant: 'warning' as const, icon: AlertTriangle };
+    return { label: 'In Stock', variant: 'success' as const, icon: CheckCircle };
+  };
+
+  return (
+    <Card className="h-full shadow-card animate-fade-in">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+            <Package className="h-5 w-5 text-primary" />
+            Inventory Items
+          </CardTitle>
+          <Badge variant="secondary" className="font-mono">
+            {filteredItems.length} items
+          </Badge>
+        </div>
+        <div className="relative mt-3">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name or HSN..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2 max-h-[500px] overflow-y-auto">
+        {filteredItems.map((item) => {
+          const status = getStockStatus(item.stock);
+          const StatusIcon = status.icon;
+          
+          return (
+            <div
+              key={item.id}
+              className="group flex items-center justify-between rounded-lg border bg-card p-3 transition-all hover:shadow-card-hover hover:border-primary/20"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-medium text-sm truncate">{item.name}</h4>
+                  <Badge variant="outline" className="font-mono text-xs">
+                    HSN: {item.hsn}
+                  </Badge>
+                </div>
+                <div className="mt-1 flex items-center gap-4 text-xs text-muted-foreground">
+                  <span className="font-mono">₹{item.rate.toLocaleString()}/{item.unit}</span>
+                  <span className="flex items-center gap-1">
+                    <StatusIcon className={`h-3 w-3 ${status.variant === 'success' ? 'text-success' : status.variant === 'warning' ? 'text-warning' : 'text-destructive'}`} />
+                    {item.stock} {item.unit}
+                  </span>
+                  <Badge variant="secondary" className="text-xs">
+                    GST: {item.gstRate}%
+                  </Badge>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => onAddItem(item)}
+                disabled={item.stock === 0}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add
+              </Button>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default InventoryList;
