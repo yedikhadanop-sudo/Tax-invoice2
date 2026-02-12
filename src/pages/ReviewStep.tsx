@@ -32,7 +32,7 @@ const ReviewStep = () => {
     [],
   );
 
-  // ✅ CALCULATE TOTALS FIRST (BEFORE handleGeneratePdf function)
+  // ✅ CALCULATE TOTALS FIRST
   const taxableTotal = items.reduce((sum, i) => {
     const base = i.item.rate * i.quantity;
     const discount = (base * i.discount) / 100;
@@ -50,7 +50,7 @@ const ReviewStep = () => {
   const previousBalance = company?.pendingAmount ?? 0;
   const totalPayable = previousBalance + grandTotal;
 
-  // ✅ NOW grandTotal is defined and available for this function
+  // ✅ NOW grandTotal is defined and available
   const handleGeneratePdf = async () => {
     if (!company || items.length === 0) return;
 
@@ -84,13 +84,51 @@ const ReviewStep = () => {
 
     setIsGenerating(true);
     try {
+      // ✅ FIX: Only pass available data
       const blob = await pdf(
         <InvoicePdf
-          invoiceNumber={invoiceNumber}
-          invoiceDate={invoiceDate}
-          items={items}
-          company={company}
-          options={options}
+          company={{
+            name: sellerInfo.name,
+            address: sellerInfo.address || [],
+            gstin: sellerInfo.gstNo,
+            state: sellerInfo.state,
+            stateCode: sellerInfo.stateCode,
+            contact: sellerInfo.contact || [],
+            email: sellerInfo.email || '',
+            website: sellerInfo.website || '',
+          }}
+          buyer={{
+            name: company.name,
+            address: [company.address],
+            gstin: company.gstNo,
+            pan: '',
+            state: company.state,
+            stateCode: company.stateCode,
+            placeOfSupply: company.state,
+          }}
+          invoiceDetails={{
+            invoiceNo: invoiceNumber,
+            invoiceDate: invoiceDate,
+            modeOfPayment: options.modeOfPayment || 'Cash',
+          }}
+          items={items.map((item, idx) => ({
+            slNo: idx + 1,
+            description: item.item.name,
+            hsnSac: '',
+            quantity: item.quantity.toString(),
+            rate: item.item.rate,
+            unit: item.item.unit,
+            amount: (item.item.rate * item.quantity) - ((item.item.rate * item.quantity * item.discount) / 100),
+          }))}
+          igstRate={18}
+          previousBalance={previousBalance}
+          bankDetails={{
+            accountHolderName: '',
+            bankName: '',
+            accountNo: '',
+            branchAndIFSC: '',
+          }}
+          notes={options.notes || ''}
         />,
       ).toBlob();
 
