@@ -6,10 +6,13 @@ import { Input } from '@/components/ui/input';
 import { InvoiceItem, InventoryItem, inventoryItems } from '@/data/mockData';
 import { useInvoiceWizardStore } from '@/store/invoiceWizardStore';
 import AddInventoryItemDialog from '@/components/AddInventoryItemDialog';
+import { useAuthStore } from '@/store/authStore';
+import { supabase } from '@/lib/supabase';
 
 const ItemsStep = () => {
   const navigate = useNavigate();
   const { items, setItems, reset } = useInvoiceWizardStore();
+  const { user } = useAuthStore();
   const [search, setSearch] = useState('');
   const [inventory, setInventory] = useState<InventoryItem[]>(inventoryItems);
 
@@ -19,6 +22,43 @@ const ItemsStep = () => {
       reset();
     }
   }, [items.length, reset]);
+
+  // Load inventory items from Supabase for this user so new items persist across browsers
+  useEffect(() => {
+    const loadInventory = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          console.error('Error loading inventory items for wizard:', error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          const mapped: InventoryItem[] = data.map((row: any) => ({
+            id: row.id as string,
+            name: row.name as string,
+            hsn: row.hsn as string,
+            rate: Number(row.rate || 0),
+            stock: Number(row.stock || 0),
+            unit: row.unit as string,
+            gstRate: Number(row.gst_rate || 0),
+          }));
+          setInventory(mapped);
+        }
+      } catch (err) {
+        console.error('Unexpected error loading inventory items for wizard:', err);
+      }
+    };
+
+    void loadInventory();
+  }, [user]);
 
   const handleAddItem = useCallback(
     (item: InventoryItem, focusQuantity: boolean = false) => {
@@ -92,11 +132,63 @@ const ItemsStep = () => {
   }, [inventory, search]);
 
   const handleCreateInventoryItem = (item: Omit<InventoryItem, 'id'>) => {
-    const newItem: InventoryItem = {
-      id: `inv-${Date.now()}`,
-      ...item,
-    };
-    setInventory((prev) => [...prev, newItem]);
+    // If not logged in for some reason, keep items only in this session
+    if (!user) {
+      const newItem: InventoryItem = {
+        id: `inv-${Date.now()}`,
+        ...item,
+      };
+      setInventory((prev) => [...prev, newItem]);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .insert({
+            user_id: user.id,
+            name: item.name,
+            hsn: item.hsn,
+            rate: item.rate,
+            stock: item.stock,
+            unit: item.unit,
+            gst_rate: item.gstRate,
+          })
+          .select('*')
+          .single();
+
+        if (error || !data) {
+          console.error('Error saving inventory item for wizard:', error);
+          // Fallback: store locally only
+          const newItem: InventoryItem = {
+            id: `inv-${Date.now()}`,
+            ...item,
+          };
+          setInventory((prev) => [...prev, newItem]);
+          return;
+        }
+
+        const saved: InventoryItem = {
+          id: data.id as string,
+          name: data.name as string,
+          hsn: data.hsn as string,
+          rate: Number(data.rate || 0),
+          stock: Number(data.stock || 0),
+          unit: data.unit as string,
+          gstRate: Number(data.gst_rate || 0),
+        };
+
+        setInventory((prev) => [...prev, saved]);
+      } catch (err) {
+        console.error('Unexpected error saving inventory item for wizard:', err);
+        const fallback: InventoryItem = {
+          id: `inv-${Date.now()}`,
+          ...item,
+        };
+        setInventory((prev) => [...prev, fallback]);
+      }
+    })();
   };
 
   return (
