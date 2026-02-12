@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { InvoiceItem, InventoryItem, inventoryItems } from '@/data/mockData';
 import { useInvoiceWizardStore } from '@/store/invoiceWizardStore';
+import AddInventoryItemDialog from '@/components/AddInventoryItemDialog';
 
 const ItemsStep = () => {
   const navigate = useNavigate();
   const { items, setItems, reset } = useInvoiceWizardStore();
   const [search, setSearch] = useState('');
+  const [inventory, setInventory] = useState<InventoryItem[]>(inventoryItems);
 
   // Start fresh when entering the wizard
   useEffect(() => {
@@ -81,13 +83,21 @@ const ItemsStep = () => {
 
   const filteredItems = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return inventoryItems;
-    return inventoryItems.filter(
+    if (!term) return inventory;
+    return inventory.filter(
       (it) =>
         it.name.toLowerCase().includes(term) ||
         it.hsn.toLowerCase().includes(term),
     );
-  }, [search]);
+  }, [inventory, search]);
+
+  const handleCreateInventoryItem = (item: Omit<InventoryItem, 'id'>) => {
+    const newItem: InventoryItem = {
+      id: `inv-${Date.now()}`,
+      ...item,
+    };
+    setInventory((prev) => [...prev, newItem]);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -107,9 +117,12 @@ const ItemsStep = () => {
           <aside className="lg:sticky lg:top-20 lg:h-fit">
             <Card className="shadow-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">
-                  Search & add items
-                </CardTitle>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-sm font-semibold">
+                    Search & add items
+                  </CardTitle>
+                  <AddInventoryItemDialog onAddItem={handleCreateInventoryItem} />
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Input
