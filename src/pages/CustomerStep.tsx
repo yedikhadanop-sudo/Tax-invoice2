@@ -25,6 +25,7 @@ const CustomerStep = () => {
         const { data, error } = await supabase
           .from('companies')
           .select('*')
+          .eq('user_id', user.id)
           .order('created_at', { ascending: true });
 
         if (error || !data) return;
